@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Health Risk Predictor</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Roboto', sans-serif; background: #1e1e2f; color: #ecf0f1; padding: 40px; }
+        h1 { text-align: center; color: #3498db; margin-bottom: 30px; }
+        form { max-width: 600px; margin: auto; background: #2c2c3e; padding: 30px; border-radius: 15px;
+               box-shadow: 0 10px 25px rgba(0,0,0,0.5); transition: 0.3s; }
+        form:hover { box-shadow: 0 15px 35px rgba(0,0,0,0.7); }
+        input[type=number] { width: 100%; padding: 12px; margin: 10px 0; border-radius:8px; border:1px solid #555;
+                              background: #3a3a50; color:#ecf0f1; transition: 0.3s; }
+        input[type=number]:focus { border-color: #3498db; outline: none; }
+        button[type=submit] { background: #3498db; color:white; padding: 15px; width:100%; border:none;
+                             border-radius:8px; cursor:pointer; font-weight:500; transition:0.3s; }
+        button[type=submit]:hover { background: #2980b9; }
+        .result { text-align:center; margin-top:25px; font-size:20px; font-weight:500; color:#ecf0f1; display: none; }
+        .progress-bar { width: 100%; background: #555; border-radius: 10px; overflow: hidden; margin-top: 10px; }
+        .progress { height: 25px; text-align:center; line-height:25px; color:white; font-weight:bold; }
+        .history { max-width:600px; margin:30px auto; background:#2c2c3e; padding:15px; border-radius:10px; display: none; }
+        .history h3 { color:#3498db; text-align:center; }
+        .history-entry { margin-bottom:10px; padding:8px; border-bottom:1px solid #444; }
+        .tooltip { position: relative; display: inline-block; border-bottom: 1px dotted #ecf0f1; }
+        .tooltip .tooltiptext { visibility: hidden; width: 220px; background-color: #555; color: #fff; 
+                                text-align: center; border-radius: 6px; padding: 5px 8px; position: absolute;
+                                z-index: 1; bottom: 125%; left: 50%; margin-left: -110px; opacity: 0; 
+                                transition: opacity 0.3s; }
+        .tooltip:hover .tooltiptext { visibility: visible; opacity: 1; }
+    </style>
+</head>
+<body>
+    <h1>Health Risk Predictor</h1>
+    <form id="predictionForm">
+        <div class="tooltip"><input type="number" id="pregnancies" name="pregnancies" step="any" placeholder="Pregnancies" required>
+        <span class="tooltiptext">Number of times pregnant (e.g., 2)</span></div>
+
+        <div class="tooltip"><input type="number" id="glucose" name="glucose" step="any" placeholder="Glucose Level" required>
+        <span class="tooltiptext">Glucose level in mg/dL (e.g., 120)</span></div>
+
+        <div class="tooltip"><input type="number" id="blood_pressure" name="blood_pressure" step="any" placeholder="Blood Pressure" required>
+        <span class="tooltiptext">Diastolic BP (mm Hg) (e.g., 70)</span></div>
+
+        <div class="tooltip"><input type="number" id="skin_thickness" name="skin_thickness" step="any" placeholder="Skin Thickness" required>
+        <span class="tooltiptext">Triceps skin fold thickness (mm) (e.g., 20)</span></div>
+
+        <div class="tooltip"><input type="number" id="insulin" name="insulin" step="any" placeholder="Insulin Level" required>
+        <span class="tooltiptext">Serum insulin (mu U/ml) (e.g., 80)</span></div>
+
+        <div class="tooltip"><input type="number" id="bmi" name="bmi" step="any" placeholder="BMI" required>
+        <span class="tooltiptext">Body Mass Index (e.g., 28.5)</span></div>
+
+        <div class="tooltip"><input type="number" id="diabetes_pedigree" name="diabetes_pedigree" step="any" placeholder="Diabetes Pedigree Function" required>
+        <span class="tooltiptext">Genetic diabetes function (e.g., 0.5)</span></div>
+
+        <div class="tooltip"><input type="number" id="age" name="age" step="any" placeholder="Age" required>
+        <span class="tooltiptext">Age in years (e.g., 45)</span></div>
+
+        <button type="submit">Predict Risk</button>
+    </form>
+
+    <div class="result" id="result">
+        <b id="risk_level"></b> - <span id="risk_prob"></span>%<br>
+        <span id="advice"></span>
+        <div class="progress-bar">
+            <div class="progress" id="progress"></div>
+        </div>
+    </div>
+
+    <div class="history" id="history">
+        <h3>Recent Predictions</h3>
+        <div id="historyEntries"></div>
+    </div>
+
+    <script>
+        const historyData = [];
+        const maxHistory = 5;
+
+        document.getElementById('predictionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+
+            try {
+                const response = await fetch('http://localhost:5000/predict', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+
+                // Update result display
+                document.getElementById('risk_level').textContent = result.risk_level;
+                document.getElementById('risk_prob').textContent = result.risk_prob;
+                document.getElementById('advice').textContent = result.advice;
+                const progressEl = document.getElementById('progress');
+                progressEl.style.width = `${result.risk_prob}%`;
+                progressEl.style.background = result.color;
+                progressEl.textContent = `${result.risk_prob}%`;
+                document.getElementById('result').style.display = 'block';
+
+                // Add to history
+                historyData.unshift({
+                    risk_level: result.risk_level,
+                    risk_prob: result.risk_prob,
+                    advice: result.advice
+                });
+                if (historyData.length > maxHistory) {
+                    historyData.pop();
+                }
+                updateHistory();
+
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to get prediction. Make sure the backend is running.');
+            }
+        });
+
+        function updateHistory() {
+            const historyEntries = document.getElementById('historyEntries');
+            historyEntries.innerHTML = '';
+            historyData.forEach(entry => {
+                const div = document.createElement('div');
+                div.className = 'history-entry';
+                div.innerHTML = `
+                    ${entry.risk_level} - ${entry.risk_prob}%<br>
+                    ${entry.advice}
+                `;
+                historyEntries.appendChild(div);
+            });
+            document.getElementById('history').style.display = 'block';
+        }
+    </script>
+</body>
+</html>
