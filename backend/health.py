@@ -1,8 +1,10 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 import pandas as pd
 import joblib
 
 app = Flask(__name__)
+CORS(app)
 model = joblib.load("health_risk_model.pkl")
 
 def risk_category(prob):
@@ -15,38 +17,41 @@ def risk_category(prob):
 
 @app.route('/', methods=['GET'])
 def home():
-    return "Health Risk API is ready."
+    return jsonify({"message": "Health Risk API is ready."})
 
 @app.route('/predict', methods=['POST'])
 def predict():
-    data = request.json
-    age = float(data['age'])
-    bmi = float(data['bmi'])
-    blood_pressure = float(data['blood_pressure'])
-    glucose = float(data['glucose'])
-    insulin = float(data['insulin'])
-    skin_thickness = float(data['skin_thickness'])
-    pregnancies = float(data['pregnancies'])
-    diabetes_pedigree = float(data['diabetes_pedigree'])
+    try:
+        data = request.json
+        age = float(data['age'])
+        bmi = float(data['bmi'])
+        blood_pressure = float(data['blood_pressure'])
+        glucose = float(data['glucose'])
+        insulin = float(data['insulin'])
+        skin_thickness = float(data['skin_thickness'])
+        pregnancies = float(data['pregnancies'])
+        diabetes_pedigree = float(data['diabetes_pedigree'])
 
-    input_df = pd.DataFrame([[
-        pregnancies, glucose, blood_pressure, skin_thickness, insulin,
-        bmi, diabetes_pedigree, age
-    ]], columns=["Pregnancies","Glucose","BloodPressure","SkinThickness",
-                 "Insulin","BMI","DiabetesPedigreeFunction","Age"])
+        input_df = pd.DataFrame([[
+            pregnancies, glucose, blood_pressure, skin_thickness, insulin,
+            bmi, diabetes_pedigree, age
+        ]], columns=["Pregnancies","Glucose","BloodPressure","SkinThickness",
+                     "Insulin","BMI","DiabetesPedigreeFunction","Age"])
 
-    prob = model.predict_proba(input_df)[0][1] * 100
-    risk_prob = round(prob, 2)
-    risk_level, color, advice = risk_category(risk_prob)
-    prediction = "Positive" if prob >= 50 else "Negative"
+        prob = model.predict_proba(input_df)[0][1] * 100
+        risk_prob = round(prob, 2)
+        risk_level, color, advice = risk_category(risk_prob)
+        prediction = "Positive" if prob >= 50 else "Negative"
 
-    return jsonify({
-        "prediction": prediction,
-        "risk_prob": risk_prob,
-        "risk_level": risk_level,
-        "color": color,
-        "advice": advice
-    })
+        return jsonify({
+            "prediction": prediction,
+            "risk_prob": risk_prob,
+            "risk_level": risk_level,
+            "color": color,
+            "advice": advice
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=False, host='0.0.0.0', port=5000)
